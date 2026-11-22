@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { movieApi, MovieItem } from '../../../lib/api';
+import { API_BASE_URL, movieApi, MovieItem } from '../../../lib/api';
 import { 
   Play, Plus, Star, ChevronLeft, Info, 
   Clock, Calendar, Languages, Film, X, Zap, 
@@ -396,8 +396,8 @@ export default function MovieDetail() {
                 playbackRate: true,
                 aspectRatio: true,
                 subtitle: {
-                   url: streamInfo.subtitles && streamInfo.subtitles.length > 0 
-                        ? `http://localhost:8000/sub-proxy?u=${encodeURIComponent(streamInfo.subtitles[0].filePath)}` 
+                   url: streamInfo.subtitles && streamInfo.subtitles.length > 0
+                        ? `${API_BASE_URL}/sub-proxy?u=${encodeURIComponent(streamInfo.subtitles[0].filePath)}`
                         : '',
                    type: 'vtt',
                    style: { color: '#fff', fontSize: '24px' },

@@ -57,7 +57,7 @@ app.add_middleware(
 # session_id -> {auth, client, content, stream, user}
 sessions: Dict[str, Dict] = {}
 
-HISTORY_FILE = "local_history.json"
+HISTORY_FILE = os.getenv("HISTORY_FILE", "local_history.json")
 
 def load_local_history() -> dict:
     if os.path.exists(HISTORY_FILE):

@@ -1,0 +1,22 @@
+.git
+.github
+.venv
+venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.DS_Store
+local_history.json
+*.log
+*.zip
+
+# Node/Next generated files
+dashboard/node_modules
+dashboard/.next
+dashboard/out
+dashboard/npm-debug.log*
+dashboard/yarn-debug.log*
+dashboard/pnpm-debug.log*
+dashboard/.env*

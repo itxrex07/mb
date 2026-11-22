@@ -591,7 +591,7 @@ link.click();
 
 | Layer | Technology |
 |---|---|
-| Frontend Framework | Next.js 16.2 (App Router) |
+| Frontend Framework | Next.js 16.4.6 (App Router) |
 | UI Styling | Tailwind CSS v4 |
 | Video Player | ArtPlayer v5 + hls.js + dash.js |
 | HTTP Client (Frontend) | Axios |
