@@ -15,15 +15,19 @@ pip install -r requirements.txt
 python moviebox_api_server.py
 ```
 
-The API listens on `http://localhost:8000`. Interactive Swagger docs are at `http://localhost:8000/docs` and the OpenAPI schema is at `http://localhost:8000/openapi.json`.
+When run directly with Python, the API listens on `http://localhost:8000`. Interactive Swagger docs are at `http://localhost:8000/docs` and the OpenAPI schema is at `http://localhost:8000/openapi.json`.
 
-### Run with Docker Compose
+### Deploy on Coolify with the Dockerfile
+
+Create a Coolify resource using the repository's root `Dockerfile` (not Docker Compose) and set **Ports Exposes** to `300`. The container listens on port 300; Coolify proxies your domain to it. Once deployed, Swagger UI is at `https://your-domain/docs`. For persistent local history, configure a Coolify persistent volume mounted at `/data`. See [`COOLIFY.md`](COOLIFY.md) for details.
+
+### Optional: Run with Docker Compose
 
 ```bash
 docker compose up --build -d
 ```
 
-The API is available at `http://localhost:8000`. For Coolify routing, HTTPS, persistence, and access protection, see [`COOLIFY.md`](COOLIFY.md).
+The Compose service listens on internal container port `300` and exposes it to Docker networks only; it does not publish a host port. For Coolify deployment, use the Dockerfile instructions above; Compose is optional.
 
 Before exposing this API publicly, put it behind access controls and HTTPS. Its login route accepts MovieBox credentials.
 
@@ -35,7 +39,7 @@ Before exposing this API publicly, put it behind access controls and HTTPS. Its 
 API client / Swagger UI
         │  HTTP REST calls
         ▼
-FastAPI API Server (port 8000)  ◄──► MovieBox/AOneRoom API servers
+FastAPI API Server (local Python: 8000; Docker container: 300)  ◄──► MovieBox/AOneRoom API servers
         │
         ├── /proxy-media  ───► CDN streams and subtitles
         ├── /play-compat  ───► FFmpeg H.265-to-H.264 transcode
@@ -57,7 +61,7 @@ FastAPI API Server (port 8000)  ◄──► MovieBox/AOneRoom API servers
 
 ## 📡 API Endpoints Reference
 
-All endpoints are served from `http://localhost:8000`.
+When running the server directly with Python, endpoints are served from `http://localhost:8000`; in the Docker image, the container listens on port `300`.
 
 ---
 
@@ -500,7 +504,7 @@ Get interactive groups.
 
 ### History is not retained after restart
 
-When using Compose, keep the `moviebox_data` volume mounted at `/data` and `HISTORY_FILE` set to `/data/local_history.json`.
+For Coolify Dockerfile deployment, mount persistent storage at `/data`. Compose instead mounts the `moviebox_data` volume there. Keep `HISTORY_FILE` set to `/data/local_history.json`.
 
 ### VLC/MPV does not open
 
