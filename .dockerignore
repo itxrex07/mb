@@ -12,11 +12,5 @@ local_history.json
 *.log
 *.zip
 
-# Node/Next generated files
-dashboard/node_modules
-dashboard/.next
-dashboard/out
-dashboard/npm-debug.log*
-dashboard/yarn-debug.log*
-dashboard/pnpm-debug.log*
-dashboard/.env*
+.env
+.env.*

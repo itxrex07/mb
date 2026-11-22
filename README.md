@@ -1,97 +1,57 @@
-# 🎬 MovieBox Pro — Unofficial Streaming Dashboard
+# MovieBox Internal API — Self-Hosted API Server
 
-A high-performance, browser-native streaming dashboard that reverse-engineers the MovieBox/AOneRoom mobile app API and exposes it through a local web dashboard. Supports H.264 & H.265 content, subtitles, watchlist, history, and external player integration.
+A FastAPI service for MovieBox/AOneRoom authentication, content discovery, playback, subtitles, history, and community endpoints. This repository contains the API backend only; it does not include a web dashboard.
+
+## Quick start
+
+### Run locally
+
+Requirements: Python 3.10+ and FFmpeg (for H.265 transcode/remux features).
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+python moviebox_api_server.py
+```
+
+The API listens on `http://localhost:8000`. Interactive Swagger docs are at `http://localhost:8000/docs` and the OpenAPI schema is at `http://localhost:8000/openapi.json`.
+
+### Run with Docker Compose
+
+```bash
+docker compose up --build -d
+```
+
+The API is available at `http://localhost:8000`. For Coolify routing, HTTPS, persistence, and access protection, see [`COOLIFY.md`](COOLIFY.md).
+
+Before exposing this API publicly, put it behind access controls and HTTPS. Its login route accepts MovieBox credentials.
 
 ---
 
-## 📱 Native Android Client
-
-For a native mobile experience, check out [AnyFilm](https://github.com/solo12345689/AnyFilm) — a native Android application built using Jetpack Compose that integrates with this internal API to deliver the streaming platform on mobile devices.
-
----
-
-## 📐 Architecture Overview
+## Architecture Overview
 
 ```
-Browser (localhost:3001)
-       │
-       │  HTTP REST calls
-       ▼
-FastAPI Backend (localhost:8000)   ◄──► MovieBox/AOneRoom API Servers
-       │                                  (api6.aoneroom.com, etc.)
-       │
-       ├── /proxy-media  ──────────────►  Raw CDN streams (CORS bypass)
-       ├── /play-compat  ──────────────►  FFMPEG H.265→H.264 Transcode Pipe
-       └── /download     ──────────────►  FFMPEG/HTTPX file download pipe
+API client / Swagger UI
+        │  HTTP REST calls
+        ▼
+FastAPI API Server (port 8000)  ◄──► MovieBox/AOneRoom API servers
+        │
+        ├── /proxy-media  ───► CDN streams and subtitles
+        ├── /play-compat  ───► FFmpeg H.265-to-H.264 transcode
+        └── /download     ───► FFmpeg/HTTPX download or remux
 ```
 
 ### Key Components
 
 | Component | File | Purpose |
 |---|---|---|
-| **Backend API Server** | `moviebox_api_server.py` | FastAPI server, all endpoints |
-| **MovieBox API Client** | `moviebox_api/client.py` | Signs & sends requests to AOneRoom |
-| **Auth Module** | `moviebox_api/auth.py` | Login, session, OTP |
-| **Content Module** | `moviebox_api/content.py` | Home, search, detail, episodes |
-| **Stream Module** | `moviebox_api/stream.py` | Playback URLs, stream resolution |
-| **Dashboard (Frontend)** | `dashboard/` | Next.js 16 web app |
-| **Video Player** | `dashboard/components/VideoPlayer.tsx` | ArtPlayer-based video player |
-| **Home Page** | `dashboard/app/page.tsx` | Main browsing UI |
-| **Detail Page** | `dashboard/app/detail/[id]/page.tsx` | Movie/series details |
-| **Watch Page** | `dashboard/app/watch/[id]/page.tsx` | Fullscreen player UI |
-
----
-
-## 🚀 Setup & Running
-
-### Prerequisites
-
-- **Python 3.10+** — for the backend
-- **Node.js 18+** — for the frontend
-- **FFMPEG** — must be in system PATH (for H.265 transcoding and downloads)
-  ```
-  # Install via Scoop (Windows)
-  scoop install ffmpeg
-  ```
-
-### Step 1: Start the Backend
-
-```powershell
-cd moviebox-internal-api
-python moviebox_api_server.py
-```
-
-Backend runs on **http://localhost:8000**
-
-> Interactive API docs available at: **http://localhost:8000/docs**
-
-### Step 2: Start the Frontend
-
-```powershell
-cd dashboard
-npm run dev -- --port 3001
-```
-
-Frontend runs on **http://localhost:3001**
-
----
-
-## 🌐 Frontend Pages
-
-| Route | Description |
-|---|---|
-| `http://localhost:3001/` | Home — Browse movies, anime, rankings, search |
-| `http://localhost:3001/detail/{id}` | Detail — Poster, synopsis, cast, episode list, community posts |
-| `http://localhost:3001/watch/{id}` | Watch — Full-screen player with subtitles, seeking, download |
-| `http://localhost:3001/profile` | Profile — User account info |
-
-### Watch Page Query Params
-
-```
-/watch/{subjectId}?s=1&e=5
-  s = season number  (default: 1)
-  e = episode number (default: 1)
-```
+| **Backend API Server** | `moviebox_api_server.py` | FastAPI application and endpoints |
+| **MovieBox API Client** | `moviebox_api/client.py` | Signs and sends requests to AOneRoom |
+| **Auth Module** | `moviebox_api/auth.py` | Login, session, and OTP operations |
+| **Content Module** | `moviebox_api/content.py` | Home, search, detail, and episodes |
+| **Stream Module** | `moviebox_api/stream.py` | Playback URL resolution and stream handling |
+| **User Module** | `moviebox_api/user.py` | Profile, history, and watchlist |
 
 ---
 
@@ -324,7 +284,7 @@ Resolve the playback URL for a movie or episode.
 }
 ```
 
-> When `isTranscoded: true`, the frontend automatically routes through the FFMPEG transcode pipe. No manual action needed.
+> When `isTranscoded: true`, API clients can use the returned `play-compat` URL to stream through the FFmpeg transcode pipe.
 
 ---
 
@@ -530,60 +490,21 @@ Get interactive groups.
 
 ---
 
-## 🎛️ Player Features (Frontend)
-
-### Virtual Timeline Engine
-When playing a **transcoded H.265 stream**, the standard browser `currentTime` API reports only the local pipe position (starts at 0). The `VideoPlayer.tsx` component implements a **Virtual Timeline Engine** that:
-
-1. **Intercepts** the native `video.currentTime` getter/setter via `Object.defineProperty`
-2. **Adds a seek offset** so the progress bar shows the true global time (e.g., `15:23 / 24:00`)
-3. **Re-tunes the transcode pipe** when seeking by calling `/play-compat/{id}?start_time={seconds}`
-
-### Subtitle Switching (Silent)
-Subtitles can be toggled on/off and switched between languages without reloading the video. The player uses:
-```ts
-art.subtitle.url = newSubtitleVttUrl;
-art.subtitle.show = true;
-```
-The backend's `/proxy-media` endpoint auto-converts `.srt` to WebVTT.
-
-### Silent Background Download
-Clicking **"Offline Mirror"** triggers a silent `<a>` element download instead of opening a new tab:
-```ts
-const link = document.createElement('a');
-link.href = downloadUrl;
-link.setAttribute('download', filename);
-link.click();
-```
-
----
-
 ## 🛠️ Troubleshooting
 
-### Video doesn't play / "No supported sources"
-- Check the backend logs for `500` errors on `/stream/{id}`
-- The stream may be HEVC-only — the system will auto-route to `/play-compat`
-- Ensure FFMPEG is installed: `ffmpeg -version`
+### Stream or download fails
 
-### Seeking restarts from 00:00
-- This happens on transcoded streams. The Virtual Timeline Engine should handle it.
-- Check browser console for `[VIRTUAL VOD]` logs to confirm it's active.
+- Check the API container logs for errors on `/stream`, `/download`, or `/play-compat`.
+- Confirm FFmpeg is installed in the image with `ffmpeg -version`.
+- Some remote streams may be unavailable or may change independently of this API.
 
-### Duration shows "00:10" instead of full movie length
-- The backend `/play-compat` response includes a `runtime` field (in minutes)
-- The frontend reads this and passes it as `duration` (in seconds) to the player plugin
+### History is not retained after restart
 
-### Subtitles not showing
-- Ensure the subtitle URL is proxied through `/proxy-media` (for CORS)
-- The backend auto-detects `.srt` and converts to WebVTT
+When using Compose, keep the `moviebox_data` volume mounted at `/data` and `HISTORY_FILE` set to `/data/local_history.json`.
 
-### MPV shows wrong duration
-- Duration is now passed as `--length={seconds}` via the `/launch-player` endpoint
-- Ensure your frontend passes `duration` in the axios POST to `/launch-player`
+### VLC/MPV does not open
 
-### CORS errors in browser console
-- Ensure the backend is running on port 8000
-- The `CORSMiddleware` allows `localhost:3000` and `localhost:3001`
+The launch endpoint runs in the server/container environment. It cannot open a media player on the visitor's computer.
 
 ---
 
@@ -591,16 +512,14 @@ link.click();
 
 | Layer | Technology |
 |---|---|
-| Frontend Framework | Next.js 16.4.6 (App Router) |
-| UI Styling | Tailwind CSS v4 |
-| Video Player | ArtPlayer v5 + hls.js + dash.js |
-| HTTP Client (Frontend) | Axios |
-| Backend Framework | FastAPI |
-| Media Proxy | HTTPX (async) |
-| Transcoding | FFMPEG (subprocess pipe) |
-| Auth | Cookie-based session (httpOnly) |
+| API Framework | FastAPI |
+| HTTP Client | HTTPX (async) |
+| Runtime | Python 3.12 in Docker |
+| Transcoding/remuxing | FFmpeg |
+| Authentication | Cookie-based API sessions |
 
 ---
+
 ## Star History
 
 <a href="https://www.star-history.com/?repos=solo12345689%2Fmoviebox-internal-api&type=date&legend=top-left">
@@ -614,27 +533,19 @@ link.click();
 ## 📁 Project Structure
 
 ```
-moviebox/
-├── moviebox_api_server.py     # Main FastAPI server (all endpoints)
+.
 ├── moviebox_api/
-│   ├── __init__.py            # Module exports
-│   ├── auth.py                # Login, register, OTP
-│   ├── client.py              # Signed HTTP client for AOneRoom API
-│   ├── content.py             # Home, search, movie detail
-│   ├── stream.py              # Stream/playback URL resolution
-│   ├── user.py                # User profile, history, watchlist
-│   └── utils.py               # Request signing utilities
-├── dashboard/
-│   ├── app/
-│   │   ├── page.tsx           # Home page
-│   │   ├── detail/[id]/page.tsx  # Detail page
-│   │   ├── watch/[id]/page.tsx   # Watch/player page
-│   │   └── profile/page.tsx   # Profile page
-│   ├── components/
-│   │   ├── VideoPlayer.tsx    # ArtPlayer-based video player
-│   │   └── MovieCard.tsx      # Movie card UI component
-│   └── lib/
-│       └── api.ts             # Frontend API client (axios wrappers)
-├── local_history.json         # Local watch history cache (auto-created)
-└── README.md                  # This file
+│   ├── auth.py
+│   ├── client.py
+│   ├── content.py
+│   ├── models.py
+│   ├── stream.py
+│   ├── user.py
+│   └── utils.py
+├── moviebox_api_server.py
+├── requirements.txt
+├── Dockerfile
+├── docker-compose.yml
+├── COOLIFY.md
+└── README.md
 ```
